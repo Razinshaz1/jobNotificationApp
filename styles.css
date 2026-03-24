@@ -4,6 +4,8 @@
   --color-accent: #880000;
   --color-success: #4f6f52;
   --color-amber: #8b6914;
+  --status-blue: #1a4480;
+  --status-reject: #8b2942;
 
   --radius-md: 8px;
   --space-1: 8px;
@@ -669,6 +671,209 @@ p {
   font-size: 0.9rem;
   color: rgba(17, 17, 17, 0.65);
   max-width: none;
+}
+
+.toast-region {
+  position: fixed;
+  bottom: var(--space-3);
+  right: var(--space-3);
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  pointer-events: none;
+  max-width: calc(100vw - var(--space-4));
+}
+
+.toast {
+  pointer-events: none;
+  background: #ffffff;
+  border: var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-width: 320px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.toast--show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.job-status-block {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+  border-top: var(--border-default);
+  margin-top: var(--space-1);
+}
+
+.job-status-label {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(17, 17, 17, 0.65);
+  max-width: none;
+}
+
+.status-chip-row {
+  display: flex;
+  align-items: center;
+}
+
+.job-status-chip {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(17, 17, 17, 0.2);
+  color: rgba(17, 17, 17, 0.75);
+}
+
+.job-status-chip--neutral {
+  border-color: rgba(17, 17, 17, 0.22);
+  color: rgba(17, 17, 17, 0.65);
+}
+
+.job-status-chip--applied {
+  color: var(--status-blue);
+  border-color: rgba(26, 68, 128, 0.45);
+}
+
+.job-status-chip--rejected {
+  color: var(--status-reject);
+  border-color: rgba(139, 41, 66, 0.45);
+}
+
+.job-status-chip--selected {
+  color: var(--color-success);
+  border-color: rgba(79, 111, 82, 0.5);
+}
+
+.status-btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.status-btn {
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  border: var(--border-default);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.status-btn:hover,
+.status-btn:focus-visible {
+  border-color: rgba(17, 17, 17, 0.45);
+  outline: none;
+}
+
+.status-btn--active {
+  border-color: var(--color-accent);
+  background: rgba(136, 0, 0, 0.06);
+  color: var(--color-text);
+}
+
+.digest-status-section {
+  width: 100%;
+  max-width: var(--content-width);
+  margin: var(--space-4) auto 0;
+  padding-top: var(--space-4);
+  border-top: var(--border-default);
+}
+
+.digest-status-title {
+  font-family: var(--font-heading);
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0 0 var(--space-2);
+}
+
+.digest-status-empty {
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgba(17, 17, 17, 0.65);
+  max-width: var(--content-width);
+}
+
+.digest-status-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.digest-status-item {
+  padding: var(--space-2) 0;
+  border-bottom: var(--border-default);
+}
+
+.digest-status-item:last-child {
+  border-bottom: none;
+}
+
+.digest-status-job {
+  margin: 0 0 var(--space-1);
+  font-weight: 500;
+  max-width: none;
+}
+
+.digest-status-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+  max-width: none;
+}
+
+.digest-status-pill {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid rgba(17, 17, 17, 0.2);
+}
+
+.digest-status-pill--neutral {
+  color: rgba(17, 17, 17, 0.65);
+}
+
+.digest-status-pill--applied {
+  color: var(--status-blue);
+  border-color: rgba(26, 68, 128, 0.4);
+}
+
+.digest-status-pill--rejected {
+  color: var(--status-reject);
+  border-color: rgba(139, 41, 66, 0.4);
+}
+
+.digest-status-pill--selected {
+  color: var(--color-success);
+  border-color: rgba(79, 111, 82, 0.45);
+}
+
+.digest-status-date {
+  color: rgba(17, 17, 17, 0.55);
+  font-size: 0.85rem;
 }
 
 .modal {
