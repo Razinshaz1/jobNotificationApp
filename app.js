@@ -1,4 +1,5 @@
 const ROUTES = {
+  "/": "Landing",
   "/dashboard": "Dashboard",
   "/settings": "Settings",
   "/saved": "Saved",
@@ -6,7 +7,7 @@ const ROUTES = {
   "/proof": "Proof",
 };
 
-const DEFAULT_ROUTE = "/dashboard";
+const DEFAULT_ROUTE = "/";
 
 function getCurrentPath() {
   const path = window.location.pathname || DEFAULT_ROUTE;
@@ -19,13 +20,68 @@ function isKnownRoute(path) {
 
 function renderRoute(path) {
   const routeView = document.getElementById("route-view");
-  const pageName = ROUTES[path];
-
-  if (pageName) {
+  if (path === "/") {
     routeView.innerHTML = `
       <section class="route-content" aria-labelledby="route-title">
-        <h1 id="route-title" class="route-title">${pageName}</h1>
+        <h1 id="route-title" class="route-title">Stop Missing The Right Jobs.</h1>
+        <p class="route-subtext">Precision-matched job discovery delivered daily at 9AM.</p>
+        <a href="/settings" data-route="/settings" class="cta-link">Start Tracking</a>
+      </section>
+    `;
+    return;
+  }
+
+  if (path === "/settings") {
+    routeView.innerHTML = `
+      <section class="route-content" aria-labelledby="route-title">
+        <h1 id="route-title" class="route-title">Settings</h1>
         <p class="route-subtext">This section will be built in the next step.</p>
+        <ul class="placeholder-list" aria-label="Preference placeholders">
+          <li>Role keywords</li>
+          <li>Preferred locations</li>
+          <li>Mode (Remote/Hybrid/Onsite)</li>
+          <li>Experience level</li>
+        </ul>
+      </section>
+    `;
+    return;
+  }
+
+  if (path === "/dashboard") {
+    routeView.innerHTML = `
+      <section class="route-content" aria-labelledby="route-title">
+        <h1 id="route-title" class="route-title">Dashboard</h1>
+        <p class="route-subtext">No jobs yet. In the next step, you will load a realistic dataset.</p>
+      </section>
+    `;
+    return;
+  }
+
+  if (path === "/saved") {
+    routeView.innerHTML = `
+      <section class="route-content" aria-labelledby="route-title">
+        <h1 id="route-title" class="route-title">Saved</h1>
+        <p class="route-subtext">Saved jobs will appear here once this section is connected in the next step.</p>
+      </section>
+    `;
+    return;
+  }
+
+  if (path === "/digest") {
+    routeView.innerHTML = `
+      <section class="route-content" aria-labelledby="route-title">
+        <h1 id="route-title" class="route-title">Digest</h1>
+        <p class="route-subtext">Daily summary previews will be introduced here in the next step.</p>
+      </section>
+    `;
+    return;
+  }
+
+  if (path === "/proof") {
+    routeView.innerHTML = `
+      <section class="route-content" aria-labelledby="route-title">
+        <h1 id="route-title" class="route-title">Proof</h1>
+        <p class="route-subtext">Artifact collection placeholders will be built in the next step.</p>
       </section>
     `;
     return;
@@ -60,10 +116,10 @@ function closeMobileMenu() {
 }
 
 function navigateTo(path, replace = false) {
-  const safePath = isKnownRoute(path) ? path : path;
+  const safePath = path;
   const currentPath = getCurrentPath();
 
-  if (safePath === currentPath && isKnownRoute(safePath)) {
+  if (safePath === currentPath) {
     closeMobileMenu();
     return;
   }
@@ -107,7 +163,7 @@ function bindNavigation() {
 
 function initializeRouting() {
   const currentPath = getCurrentPath();
-  const initialPath = currentPath === "/" ? DEFAULT_ROUTE : currentPath;
+  const initialPath = currentPath || DEFAULT_ROUTE;
   navigateTo(initialPath, true);
 }
 
