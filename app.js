@@ -9,6 +9,7 @@ const ROUTES = {
 
 const DEFAULT_ROUTE = "/";
 const STORAGE_KEY = "jobNotificationTracker_savedIds";
+const PREFS_KEY = "jobTracker Preferences";
 
 function getJobs() {
   return Array.isArray(window.JOBS) ? window.JOBS : [];
@@ -62,6 +63,158 @@ function toggleSaveJob(id) {
   setSavedIds(ids);
 }
 
+function emptyPreferences() {
+  return {
+    roleKeywords: "",
+    preferredLocations: [],
+    preferredMode: [],
+    experienceLevel: "",
+    skills: "",
+    minMatchScore: 40,
+  };
+}
+
+function getPreferencesRaw() {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function preferencesAreSaved() {
+  return localStorage.getItem(PREFS_KEY) !== null;
+}
+
+function clamp(n, lo, hi) {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+function getMergedPreferences() {
+  const raw = getPreferencesRaw() || {};
+  const merged = Object.assign(emptyPreferences(), raw);
+  merged.preferredLocations = Array.isArray(merged.preferredLocations)
+    ? merged.preferredLocations
+    : [];
+  merged.preferredMode = Array.isArray(merged.preferredMode) ? merged.preferredMode : [];
+  const minRaw = Number(merged.minMatchScore);
+  merged.minMatchScore = clamp(Number.isFinite(minRaw) ? minRaw : 40, 0, 100);
+  return merged;
+}
+
+function savePreferencesFromForm(form) {
+  const roleKeywords = (form.querySelector('[name="roleKeywords"]')?.value || "").trim();
+  const select = form.querySelector('[name="preferredLocations"]');
+  const preferredLocations = select
+    ? Array.from(select.selectedOptions)
+        .map((o) => o.value)
+        .filter(Boolean)
+    : [];
+  const preferredMode = Array.from(form.querySelectorAll('[name="preferredMode"]:checked')).map((c) =>
+    c.value.trim()
+  );
+  const experienceLevel = form.querySelector('[name="experienceLevel"]')?.value || "";
+  const skills = (form.querySelector('[name="skills"]')?.value || "").trim();
+  const rawMin = Number(form.querySelector('[name="minMatchScore"]')?.value);
+  const minMatchScore = clamp(Number.isFinite(rawMin) ? rawMin : 40, 0, 100);
+
+  const payload = {
+    roleKeywords,
+    preferredLocations,
+    preferredMode,
+    experienceLevel,
+    skills,
+    minMatchScore,
+  };
+  localStorage.setItem(PREFS_KEY, JSON.stringify(payload));
+}
+
+function parseCommaKeywords(text) {
+  return String(text || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function parseCommaSkills(text) {
+  return String(text || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Deterministic match score per specification (+25 title, +15 desc, +15 location,
+ * +10 mode, +10 experience, +15 skill overlap, +5 recent, +5 LinkedIn). Cap 100.
+ */
+function computeMatchScore(job, prefs) {
+  const p = prefs || emptyPreferences();
+  let score = 0;
+
+  const keywords = parseCommaKeywords(p.roleKeywords);
+  const titleLower = (job.title || "").toLowerCase();
+  const descLower = (job.description || "").toLowerCase();
+
+  if (keywords.length > 0 && keywords.some((k) => titleLower.includes(k))) {
+    score += 25;
+  }
+  if (keywords.length > 0 && keywords.some((k) => descLower.includes(k))) {
+    score += 15;
+  }
+
+  const locs = Array.isArray(p.preferredLocations) ? p.preferredLocations : [];
+  if (locs.length > 0 && locs.includes(job.location)) {
+    score += 15;
+  }
+
+  const modes = Array.isArray(p.preferredMode) ? p.preferredMode : [];
+  if (modes.length > 0 && modes.includes(job.mode)) {
+    score += 10;
+  }
+
+  const expLevel = (p.experienceLevel || "").trim();
+  if (expLevel && job.experience === expLevel) {
+    score += 10;
+  }
+
+  const userSkills = parseCommaSkills(p.skills);
+  const jobSkillSet = (job.skills || []).map((s) => String(s).trim().toLowerCase());
+  if (
+    userSkills.length > 0 &&
+    userSkills.some((us) => jobSkillSet.some((js) => js === us))
+  ) {
+    score += 15;
+  }
+
+  if (Number(job.postedDaysAgo) <= 2) {
+    score += 5;
+  }
+  if (job.source === "Linkedin") {
+    score += 5;
+  }
+
+  return Math.min(100, score);
+}
+
+function salarySortKey(range) {
+  const s = String(range || "");
+  let m = s.match(/(\d+)\s*-\s*(\d+)/);
+  if (m) return parseInt(m[1], 10);
+  m = s.match(/₹\s*(\d+)\s*k/i);
+  if (m) return parseInt(m[1], 10);
+  m = s.match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function matchBadgeClass(score) {
+  if (score >= 80) return "match-badge match-badge--high";
+  if (score >= 60) return "match-badge match-badge--mid";
+  if (score >= 40) return "match-badge match-badge--neutral";
+  return "match-badge match-badge--low";
+}
+
 function formatPostedDays(days) {
   const d = Number(days);
   if (d === 0) return "Today";
@@ -75,43 +228,64 @@ function uniqueSortedLocations(jobs) {
   );
 }
 
-function filterAndSortJobs(jobs, filters) {
+function passesBarFilters(job, filters) {
   const keyword = (filters.keyword || "").trim().toLowerCase();
-  const { location, mode, experience, source, sort } = filters;
-
-  let list = jobs.filter((job) => {
-    if (keyword) {
-      const hay = `${job.title} ${job.company}`.toLowerCase();
-      if (!hay.includes(keyword)) return false;
-    }
-    if (location && job.location !== location) return false;
-    if (mode && job.mode !== mode) return false;
-    if (experience && job.experience !== experience) return false;
-    if (source && job.source !== source) return false;
-    return true;
-  });
-
-  if (sort === "oldest") {
-    list = [...list].sort((a, b) => b.postedDaysAgo - a.postedDaysAgo);
-  } else if (sort === "company") {
-    list = [...list].sort((a, b) => {
-      const c = a.company.localeCompare(b.company, undefined, { sensitivity: "base" });
-      if (c !== 0) return c;
-      return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
-    });
-  } else {
-    list = [...list].sort((a, b) => a.postedDaysAgo - b.postedDaysAgo);
+  if (keyword) {
+    const hay = `${job.title} ${job.company}`.toLowerCase();
+    if (!hay.includes(keyword)) return false;
   }
-
-  return list;
+  if (filters.location && job.location !== filters.location) return false;
+  if (filters.mode && job.mode !== filters.mode) return false;
+  if (filters.experience && job.experience !== filters.experience) return false;
+  if (filters.source && job.source !== filters.source) return false;
+  return true;
 }
 
-function jobCardHtml(job) {
+function sortDashboardItems(items, sort) {
+  const copy = [...items];
+  if (sort === "oldest") {
+    copy.sort(
+      (a, b) =>
+        b.job.postedDaysAgo - a.job.postedDaysAgo || a.job.id.localeCompare(b.job.id)
+    );
+  } else if (sort === "company") {
+    copy.sort((a, b) => {
+      const c = a.job.company.localeCompare(b.job.company, undefined, { sensitivity: "base" });
+      if (c !== 0) return c;
+      return a.job.title.localeCompare(b.job.title, undefined, { sensitivity: "base" });
+    });
+  } else if (sort === "match") {
+    copy.sort(
+      (a, b) =>
+        b.matchScore - a.matchScore ||
+        a.job.postedDaysAgo - b.job.postedDaysAgo ||
+        a.job.id.localeCompare(b.job.id)
+    );
+  } else if (sort === "salary") {
+    copy.sort(
+      (a, b) =>
+        salarySortKey(b.job.salaryRange) - salarySortKey(a.job.salaryRange) ||
+        a.job.id.localeCompare(b.job.id)
+    );
+  } else {
+    copy.sort(
+      (a, b) =>
+        a.job.postedDaysAgo - b.job.postedDaysAgo || a.job.id.localeCompare(b.job.id)
+    );
+  }
+  return copy;
+}
+
+function jobCardHtml(job, matchScore) {
   const saved = isJobSaved(job.id);
   const saveLabel = saved ? "Saved" : "Save";
   const saveClass = saved ? "btn btn-secondary" : "btn btn-primary";
+  const badge = `<span class="${matchBadgeClass(matchScore)}"><span class="match-badge-label">Match</span> ${matchScore}</span>`;
   return `
     <article class="job-card" aria-label="${escapeHtml(job.title)} at ${escapeHtml(job.company)}">
+      <div class="job-card-top">
+        ${badge}
+      </div>
       <h3 class="job-card-title">${escapeHtml(job.title)}</h3>
       <p class="job-card-company">${escapeHtml(job.company)}</p>
       <p class="job-card-meta">${escapeHtml(job.location)} · ${escapeHtml(job.mode)}</p>
@@ -156,40 +330,107 @@ function readDashboardFilters() {
   };
 }
 
+let dashboardRafStep = null;
+let lastDashboardSignature = "";
+
+function scheduleDashboardRefresh() {
+  if (dashboardRafStep !== null) return;
+  dashboardRafStep = requestAnimationFrame(() => {
+    dashboardRafStep = null;
+    applyDashboardFilters();
+  });
+}
+
+function buildDashboardSignature(items, filters, onlyMatches, minThreshold) {
+  return JSON.stringify({
+    f: filters,
+    o: onlyMatches,
+    m: minThreshold,
+    p: getMergedPreferences(),
+    ids: items.map((i) => i.job.id),
+    s: items.map((i) => i.matchScore),
+    saved: getSavedIds(),
+  });
+}
+
 function applyDashboardFilters() {
   const grid = document.getElementById("job-grid");
   const empty = document.getElementById("job-empty");
   if (!grid || !empty) return;
 
-  const jobs = getJobs();
-  const filtered = filterAndSortJobs(jobs, readDashboardFilters());
+  const filters = readDashboardFilters();
+  const prefsMerged = getMergedPreferences();
+  const onlyMatchesEl = document.getElementById("dashboard-only-matches");
+  const onlyMatches = onlyMatchesEl ? onlyMatchesEl.checked : false;
+  const minRaw = Number(prefsMerged.minMatchScore);
+  const minThreshold = clamp(Number.isFinite(minRaw) ? minRaw : 40, 0, 100);
 
-  if (filtered.length === 0) {
+  let jobs = getJobs().filter((job) => passesBarFilters(job, filters));
+  let items = jobs.map((job) => ({
+    job,
+    matchScore: computeMatchScore(job, prefsMerged),
+  }));
+
+  if (onlyMatches) {
+    items = items.filter((x) => x.matchScore >= minThreshold);
+  }
+
+  items = sortDashboardItems(items, filters.sort);
+
+  const sig = buildDashboardSignature(items, filters, onlyMatches, minThreshold);
+  if (sig === lastDashboardSignature && grid.childElementCount === items.length) {
+    return;
+  }
+  lastDashboardSignature = sig;
+
+  if (items.length === 0) {
     grid.innerHTML = "";
     empty.hidden = false;
+    empty.textContent =
+      "No roles match your criteria. Adjust filters or lower threshold.";
     return;
   }
 
   empty.hidden = true;
-  grid.innerHTML = filtered.map((job) => jobCardHtml(job)).join("");
+  grid.innerHTML = items.map(({ job, matchScore }) => jobCardHtml(job, matchScore)).join("");
+}
+
+function resetDashboardCache() {
+  lastDashboardSignature = "";
 }
 
 function bindDashboardFilters() {
   const root = document.getElementById("dashboard-filters");
   if (!root) return;
-  root.addEventListener("input", applyDashboardFilters);
-  root.addEventListener("change", applyDashboardFilters);
+  root.addEventListener("input", scheduleDashboardRefresh);
+  root.addEventListener("change", scheduleDashboardRefresh);
+
+  const toggle = document.getElementById("dashboard-only-matches");
+  if (toggle) {
+    toggle.addEventListener("change", () => {
+      resetDashboardCache();
+      scheduleDashboardRefresh();
+    });
+  }
 }
 
 function renderDashboard() {
+  resetDashboardCache();
+  dashboardRafStep = null;
   const routeView = document.getElementById("route-view");
   const jobs = getJobs();
   const locations = uniqueSortedLocations(jobs);
+  const showPrefsBanner = !preferencesAreSaved();
 
   routeView.innerHTML = `
     <section class="route-content dashboard-route" aria-labelledby="route-title">
       <h1 id="route-title" class="route-title">Dashboard</h1>
       <p class="route-subtext">Browse openings from Indian tech employers. Refine the list, inspect details, and save roles to revisit later.</p>
+      ${
+        showPrefsBanner
+          ? `<div class="prefs-banner" role="status">Set your preferences to activate intelligent matching.</div>`
+          : ""
+      }
       <div id="dashboard-filters" class="filter-bar" role="search" aria-label="Filter jobs">
         <div class="filter-field filter-field-grow">
           <label for="filter-keyword">Keyword</label>
@@ -236,10 +477,18 @@ function renderDashboard() {
             <option value="latest" selected>Latest</option>
             <option value="oldest">Oldest</option>
             <option value="company">Company A–Z</option>
+            <option value="match">Match score</option>
+            <option value="salary">Salary</option>
           </select>
         </div>
       </div>
-      <p id="job-empty" class="empty-search" hidden>No jobs match your search.</p>
+      <div class="dashboard-threshold">
+        <label class="threshold-label">
+          <input type="checkbox" id="dashboard-only-matches" />
+          <span>Show only jobs above my threshold</span>
+        </label>
+      </div>
+      <p id="job-empty" class="empty-search" hidden>No roles match your criteria. Adjust filters or lower threshold.</p>
       <div id="job-grid" class="job-grid"></div>
     </section>
   `;
@@ -248,10 +497,87 @@ function renderDashboard() {
   applyDashboardFilters();
 }
 
+function renderSettings() {
+  const routeView = document.getElementById("route-view");
+  const jobs = getJobs();
+  const locations = uniqueSortedLocations(jobs);
+  const prefs = getMergedPreferences();
+  const prefLocs = prefs.preferredLocations;
+  const prefModes = prefs.preferredMode;
+
+  routeView.innerHTML = `
+    <section class="route-content" aria-labelledby="route-title">
+      <h1 id="route-title" class="route-title">Settings</h1>
+      <p class="route-subtext">Define how roles are scored on the dashboard. Preferences stay on this device.</p>
+      <form id="settings-form" class="settings-form" novalidate>
+        <div class="settings-field">
+          <label for="settings-role-keywords">Role keywords (comma-separated)</label>
+          <input id="settings-role-keywords" name="roleKeywords" type="text" autocomplete="off" placeholder="e.g. React, Backend intern" value="${escapeHtml(prefs.roleKeywords)}" />
+        </div>
+        <div class="settings-field">
+          <label for="settings-locations">Preferred locations</label>
+          <select id="settings-locations" name="preferredLocations" multiple size="6">
+            ${locations
+              .map((loc) => {
+                const sel = prefLocs.includes(loc) ? " selected" : "";
+                return `<option value="${escapeHtml(loc)}"${sel}>${escapeHtml(loc)}</option>`;
+              })
+              .join("")}
+          </select>
+          <p class="settings-hint">Hold Ctrl or Cmd to select multiple.</p>
+        </div>
+        <fieldset class="settings-fieldset">
+          <legend>Preferred mode</legend>
+          <label class="settings-check"><input type="checkbox" name="preferredMode" value="Remote" ${prefModes.includes("Remote") ? "checked" : ""} /> Remote</label>
+          <label class="settings-check"><input type="checkbox" name="preferredMode" value="Hybrid" ${prefModes.includes("Hybrid") ? "checked" : ""} /> Hybrid</label>
+          <label class="settings-check"><input type="checkbox" name="preferredMode" value="Onsite" ${prefModes.includes("Onsite") ? "checked" : ""} /> Onsite</label>
+        </fieldset>
+        <div class="settings-field">
+          <label for="settings-experience">Experience level</label>
+          <select id="settings-experience" name="experienceLevel">
+            <option value=""${prefs.experienceLevel === "" ? " selected" : ""}>Any (no filter in score)</option>
+            <option value="Fresher"${prefs.experienceLevel === "Fresher" ? " selected" : ""}>Fresher</option>
+            <option value="0-1"${prefs.experienceLevel === "0-1" ? " selected" : ""}>0-1</option>
+            <option value="1-3"${prefs.experienceLevel === "1-3" ? " selected" : ""}>1-3</option>
+            <option value="3-5"${prefs.experienceLevel === "3-5" ? " selected" : ""}>3-5</option>
+          </select>
+        </div>
+        <div class="settings-field">
+          <label for="settings-skills">Skills (comma-separated)</label>
+          <input id="settings-skills" name="skills" type="text" autocomplete="off" placeholder="e.g. JavaScript, SQL" value="${escapeHtml(prefs.skills)}" />
+        </div>
+        <div class="settings-field">
+          <label for="settings-min-score">Minimum match score threshold: <span id="settings-min-score-value">${escapeHtml(String(prefs.minMatchScore))}</span></label>
+          <input id="settings-min-score" name="minMatchScore" type="range" min="0" max="100" step="1" value="${escapeHtml(String(prefs.minMatchScore))}" />
+        </div>
+        <div class="settings-actions">
+          <button type="submit" class="btn btn-primary">Save preferences</button>
+        </div>
+      </form>
+    </section>
+  `;
+
+  const form = document.getElementById("settings-form");
+  const range = document.getElementById("settings-min-score");
+  const rangeOut = document.getElementById("settings-min-score-value");
+  if (range && rangeOut) {
+    range.addEventListener("input", () => {
+      rangeOut.textContent = range.value;
+    });
+  }
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    savePreferencesFromForm(form);
+    resetDashboardCache();
+    rangeOut.textContent = String(clamp(Number(range.value), 0, 100));
+  });
+}
+
 function renderSaved() {
   const routeView = document.getElementById("route-view");
   const jobs = getJobs();
   const saved = getSavedIds();
+  const prefsMerged = getMergedPreferences();
   const savedJobs = saved
     .map((id) => jobs.find((j) => j.id === id))
     .filter(Boolean);
@@ -273,7 +599,9 @@ function renderSaved() {
     <section class="route-content" aria-labelledby="route-title">
       <h1 id="route-title" class="route-title">Saved</h1>
       <p class="route-subtext">${savedJobs.length} role${savedJobs.length === 1 ? "" : "s"} saved on this device.</p>
-      <div class="job-grid">${savedJobs.map((job) => jobCardHtml(job)).join("")}</div>
+      <div class="job-grid">${savedJobs
+        .map((job) => jobCardHtml(job, computeMatchScore(job, prefsMerged)))
+        .join("")}</div>
     </section>
   `;
 }
@@ -310,6 +638,7 @@ function openJobModal(job) {
 
 function refreshVisibleJobLists() {
   const path = getCurrentPath();
+  resetDashboardCache();
   if (path === "/dashboard") {
     applyDashboardFilters();
   } else if (path === "/saved") {
@@ -333,18 +662,7 @@ function renderRoute(path) {
   }
 
   if (path === "/settings") {
-    routeView.innerHTML = `
-      <section class="route-content" aria-labelledby="route-title">
-        <h1 id="route-title" class="route-title">Settings</h1>
-        <p class="route-subtext">This section will be built in the next step.</p>
-        <ul class="placeholder-list" aria-label="Preference placeholders">
-          <li>Role keywords</li>
-          <li>Preferred locations</li>
-          <li>Mode (Remote/Hybrid/Onsite)</li>
-          <li>Experience level</li>
-        </ul>
-      </section>
-    `;
+    renderSettings();
     return;
   }
 
