@@ -14,95 +14,37 @@
   </head>
   <body>
     <div class="app-shell">
-      <header class="top-bar" role="banner">
-        <div class="brand">Job Notification App</div>
-        <div class="progress" aria-label="Progress">Step 1 / 4</div>
-        <div class="status-badge status-not-started">Not Started</div>
+      <header class="top-nav" role="banner">
+        <div class="top-nav-row">
+          <div class="brand">Job Notification App</div>
+          <button
+            type="button"
+            class="menu-toggle"
+            aria-expanded="false"
+            aria-controls="mobile-nav-panel"
+            aria-label="Open navigation menu"
+          >
+            Menu
+          </button>
+          <nav class="nav-links desktop-nav" aria-label="Primary Navigation">
+            <a href="/dashboard" data-route="/dashboard">Dashboard</a>
+            <a href="/saved" data-route="/saved">Saved</a>
+            <a href="/digest" data-route="/digest">Digest</a>
+            <a href="/settings" data-route="/settings">Settings</a>
+            <a href="/proof" data-route="/proof">Proof</a>
+          </nav>
+        </div>
+        <nav id="mobile-nav-panel" class="mobile-nav" aria-label="Mobile Navigation">
+          <a href="/dashboard" data-route="/dashboard">Dashboard</a>
+          <a href="/saved" data-route="/saved">Saved</a>
+          <a href="/digest" data-route="/digest">Digest</a>
+          <a href="/settings" data-route="/settings">Settings</a>
+          <a href="/proof" data-route="/proof">Proof</a>
+        </nav>
       </header>
 
-      <section class="context-header" aria-labelledby="context-title">
-        <h1 id="context-title">Build a calm and reliable notification workflow.</h1>
-        <p>
-          This foundation focuses on visual clarity, predictable structure, and
-          consistent interaction patterns.
-        </p>
-      </section>
-
-      <main class="workspace-grid">
-        <section class="primary-workspace" aria-label="Primary Workspace">
-          <article class="card">
-            <h2>Core Card Structure</h2>
-            <p>
-              Use cards to organize information without crowding. Keep
-              typography readable and spacing intentional.
-            </p>
-            <div class="actions">
-              <button class="btn btn-primary" type="button">Primary Action</button>
-              <button class="btn btn-secondary" type="button">
-                Secondary Action
-              </button>
-            </div>
-          </article>
-
-          <article class="card">
-            <h2>Input Baseline</h2>
-            <p>Inputs stay clean, clear, and consistent across the product.</p>
-            <div class="field-group">
-              <label for="job-title">Job Title</label>
-              <input id="job-title" type="text" placeholder="e.g. Product Analyst" />
-            </div>
-            <div class="field-group">
-              <label for="location">Location</label>
-              <input id="location" type="text" placeholder="e.g. Bengaluru" />
-            </div>
-          </article>
-
-          <article class="card" aria-live="polite">
-            <h2>Message States</h2>
-            <div class="state state-error" role="alert">
-              We could not load notifications. Check your connection and retry.
-            </div>
-            <div class="state state-empty">
-              No rules are configured yet. Start by creating your first rule.
-            </div>
-          </article>
-        </section>
-
-        <aside class="secondary-panel" aria-label="Secondary Panel">
-          <div class="card panel-card">
-            <h3>Step Explanation</h3>
-            <p>
-              Keep each step explicit and short so users always understand what
-              to do next.
-            </p>
-          </div>
-
-          <div class="card panel-card">
-            <h3>Copyable Prompt</h3>
-            <textarea readonly rows="5">
-Build a clear notification rule using role, location, and salary range.
-            </textarea>
-            <button class="btn btn-secondary" type="button">Copy Prompt</button>
-          </div>
-
-          <div class="card panel-card">
-            <h3>Consistent Actions</h3>
-            <div class="actions">
-              <button class="btn btn-primary" type="button">Save Draft</button>
-              <button class="btn btn-secondary" type="button">Review</button>
-            </div>
-          </div>
-        </aside>
-      </main>
-
-      <footer class="proof-footer" aria-label="Proof Footer">
-        <ul>
-          <li><span class="dot"></span>UI Built</li>
-          <li><span class="dot"></span>Logic Working</li>
-          <li><span class="dot"></span>Test Passed</li>
-          <li><span class="dot"></span>Deployed</li>
-        </ul>
-      </footer>
+      <main id="route-view" class="route-view" aria-live="polite"></main>
     </div>
+    <script src="./app.js"></script>
   </body>
 </html>
