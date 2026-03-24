@@ -522,6 +522,155 @@ p {
   margin-top: var(--space-1);
 }
 
+.digest-route .route-title {
+  max-width: var(--content-width);
+}
+
+.digest-block {
+  border: var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  max-width: var(--content-width);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.digest-block-title {
+  font-family: var(--font-heading);
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0;
+  max-width: var(--content-width);
+}
+
+.digest-sim-note {
+  margin: 0;
+  max-width: var(--content-width);
+  font-size: 0.9rem;
+  color: rgba(17, 17, 17, 0.6);
+}
+
+.digest-controls {
+  display: grid;
+  gap: var(--space-2);
+  max-width: var(--content-width);
+}
+
+.digest-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.digest-panel-outer {
+  width: 100%;
+  max-width: var(--content-width);
+  margin: 0 auto;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.digest-empty-message {
+  margin: 0;
+  padding: var(--space-3);
+  border: var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  max-width: var(--content-width);
+}
+
+.digest-email-card {
+  background: #ffffff;
+  border: var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: grid;
+  gap: var(--space-3);
+}
+
+.digest-email-header {
+  border-bottom: var(--border-default);
+  padding-bottom: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.digest-email-title {
+  font-family: var(--font-heading);
+  font-size: 1.65rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.digest-email-date {
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgba(17, 17, 17, 0.65);
+  max-width: none;
+}
+
+.digest-email-body {
+  display: grid;
+  gap: 0;
+}
+
+.digest-email-item {
+  padding: var(--space-3) 0;
+  border-top: var(--border-default);
+}
+
+.digest-email-item:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.digest-item-title {
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 var(--space-1);
+}
+
+.digest-item-company {
+  font-weight: 500;
+  margin: 0 0 var(--space-2);
+  max-width: none;
+}
+
+.digest-item-line {
+  margin: 0 0 var(--space-1);
+  font-size: 0.95rem;
+  max-width: none;
+}
+
+.digest-item-label {
+  color: rgba(17, 17, 17, 0.6);
+  margin-right: var(--space-1);
+}
+
+.digest-item-apply {
+  margin: var(--space-2) 0 0;
+}
+
+.digest-item-apply .btn {
+  display: inline-flex;
+  text-decoration: none;
+}
+
+.digest-email-footer {
+  border-top: var(--border-default);
+  padding-top: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.digest-email-footer p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: rgba(17, 17, 17, 0.65);
+  max-width: none;
+}
+
 .modal {
   position: fixed;
   inset: 0;

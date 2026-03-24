@@ -573,6 +573,244 @@ function renderSettings() {
   });
 }
 
+function todayYmd() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function digestStorageKey(ymd) {
+  return `jobTrackerDigest_${ymd}`;
+}
+
+function formatDigestDateLong(ymd) {
+  const parts = ymd.split("-").map(Number);
+  if (parts.length !== 3) return ymd;
+  const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+  return dt.toLocaleDateString("en-IN", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function buildTopDigestJobs() {
+  const jobs = getJobs();
+  if (jobs.length === 0) return [];
+  const prefs = getMergedPreferences();
+  const scored = jobs.map((job) => ({
+    job,
+    matchScore: computeMatchScore(job, prefs),
+  }));
+  scored.sort(
+    (a, b) =>
+      b.matchScore - a.matchScore ||
+      a.job.postedDaysAgo - b.job.postedDaysAgo ||
+      a.job.id.localeCompare(b.job.id)
+  );
+  return scored.slice(0, 10);
+}
+
+function persistDigestPayload(ymd, scoredItems) {
+  const payload = {
+    date: ymd,
+    items: scoredItems.map(({ job, matchScore }) => ({
+      id: job.id,
+      matchScore,
+    })),
+  };
+  localStorage.setItem(digestStorageKey(ymd), JSON.stringify(payload));
+}
+
+function readDigestPayload(ymd) {
+  try {
+    const raw = localStorage.getItem(digestStorageKey(ymd));
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || !Array.isArray(data.items)) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function hydrateDigestPayload(payload) {
+  const jobs = getJobs();
+  const byId = new Map(jobs.map((j) => [j.id, j]));
+  return payload.items
+    .map((row) => {
+      const job = byId.get(row.id);
+      if (!job) return null;
+      return { job, matchScore: Number(row.matchScore) || 0 };
+    })
+    .filter(Boolean);
+}
+
+let digestPlainTextCache = "";
+
+function buildDigestPlainText(ymd, hydrated) {
+  const header = "Top 10 Jobs For You 9AM Digest";
+  const dateLine = formatDigestDateLong(ymd);
+  let body = `${header}\n${dateLine}\n\n`;
+  hydrated.forEach((row, i) => {
+    const { job, matchScore } = row;
+    body += `${i + 1}. ${job.title} — ${job.company}\n`;
+    body += `   Location: ${job.location}\n`;
+    body += `   Experience: ${job.experience}\n`;
+    body += `   Match score: ${matchScore}\n`;
+    body += `   Apply: ${job.applyUrl}\n\n`;
+  });
+  body += "This digest was generated based on your preferences.\n";
+  return body;
+}
+
+function setDigestToolbarVisible(visible) {
+  const toolbar = document.querySelector(".digest-toolbar");
+  if (toolbar) toolbar.hidden = !visible;
+}
+
+function renderDigestCardInDom(ymd, hydrated) {
+  const card = document.getElementById("digest-email-card");
+  const empty = document.getElementById("digest-empty");
+  if (!card || !empty) return;
+
+  if (hydrated.length === 0) {
+    card.hidden = true;
+    card.innerHTML = "";
+    empty.hidden = false;
+    setDigestToolbarVisible(false);
+    digestPlainTextCache = "";
+    return;
+  }
+
+  empty.hidden = true;
+  card.hidden = false;
+  setDigestToolbarVisible(true);
+
+  digestPlainTextCache = buildDigestPlainText(ymd, hydrated);
+
+  const dateLong = formatDigestDateLong(ymd);
+  card.innerHTML = `
+    <header class="digest-email-header">
+      <h2 class="digest-email-title">Top 10 Jobs For You 9AM Digest</h2>
+      <p class="digest-email-date">${escapeHtml(dateLong)}</p>
+    </header>
+    <div class="digest-email-body">
+      ${hydrated
+        .map(
+          ({ job, matchScore }) => `
+        <div class="digest-email-item">
+          <h3 class="digest-item-title">${escapeHtml(job.title)}</h3>
+          <p class="digest-item-company">${escapeHtml(job.company)}</p>
+          <p class="digest-item-line"><span class="digest-item-label">Location</span> ${escapeHtml(job.location)}</p>
+          <p class="digest-item-line"><span class="digest-item-label">Experience</span> ${escapeHtml(job.experience)}</p>
+          <p class="digest-item-line"><span class="digest-item-label">Match score</span> ${matchScore}</p>
+          <p class="digest-item-apply"><a class="btn btn-secondary" href="${escapeHtml(job.applyUrl)}" target="_blank" rel="noopener noreferrer">Apply</a></p>
+        </div>
+      `
+        )
+        .join("")}
+    </div>
+    <footer class="digest-email-footer">
+      <p>This digest was generated based on your preferences.</p>
+    </footer>
+  `;
+}
+
+function refreshDigestPanel() {
+  if (!preferencesAreSaved() || getCurrentPath() !== "/digest") return;
+  const ymd = todayYmd();
+  const existing = readDigestPayload(ymd);
+  if (!existing || !existing.items || existing.items.length === 0) {
+    const card = document.getElementById("digest-email-card");
+    const empty = document.getElementById("digest-empty");
+    if (card) {
+      card.hidden = true;
+      card.innerHTML = "";
+    }
+    if (empty) empty.hidden = true;
+    setDigestToolbarVisible(false);
+    digestPlainTextCache = "";
+    return;
+  }
+  const hydrated = hydrateDigestPayload(existing);
+  renderDigestCardInDom(ymd, hydrated);
+}
+
+function handleDigestGenerate() {
+  if (!preferencesAreSaved()) return;
+  const ymd = todayYmd();
+  const existing = readDigestPayload(ymd);
+  if (existing && existing.items && existing.items.length > 0) {
+    const hydrated = hydrateDigestPayload(existing);
+    renderDigestCardInDom(ymd, hydrated.length ? hydrated : []);
+    return;
+  }
+  const top = buildTopDigestJobs();
+  if (top.length === 0) {
+    renderDigestCardInDom(ymd, []);
+    return;
+  }
+  persistDigestPayload(ymd, top);
+  renderDigestCardInDom(ymd, top);
+}
+
+function handleDigestCopy() {
+  const text = digestPlainTextCache;
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+}
+
+function handleDigestEmail() {
+  const text = digestPlainTextCache;
+  if (!text) return;
+  const subject = encodeURIComponent("My 9AM Job Digest");
+  const body = encodeURIComponent(text);
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+}
+
+function renderDigest() {
+  digestPlainTextCache = "";
+  const routeView = document.getElementById("route-view");
+  if (!preferencesAreSaved()) {
+    routeView.innerHTML = `
+      <section class="route-content digest-route" aria-labelledby="route-title">
+        <h1 id="route-title" class="route-title">Digest</h1>
+        <div class="digest-block" role="alert">
+          <p class="digest-block-title">Set preferences to generate a personalized digest.</p>
+          <p class="route-subtext">Save your role criteria in Settings, then return here to build your 9AM summary.</p>
+          <a href="/settings" data-route="/settings" class="btn btn-primary">Open Settings</a>
+        </div>
+      </section>
+    `;
+    return;
+  }
+
+  routeView.innerHTML = `
+    <section class="route-content digest-route" aria-labelledby="route-title">
+      <h1 id="route-title" class="route-title">Digest</h1>
+      <p class="digest-sim-note">Demo Mode: Daily 9AM trigger simulated manually.</p>
+      <div class="digest-controls">
+        <button type="button" class="btn btn-primary" data-digest-action="generate">Generate Today's 9AM Digest (Simulated)</button>
+        <div class="digest-toolbar" hidden>
+          <button type="button" class="btn btn-secondary" data-digest-action="copy">Copy Digest to Clipboard</button>
+          <button type="button" class="btn btn-secondary" data-digest-action="email">Create Email Draft</button>
+        </div>
+      </div>
+      <div class="digest-panel-outer">
+        <p id="digest-empty" class="digest-empty-message" hidden>No matching roles today. Check again tomorrow.</p>
+        <article class="digest-email-card" id="digest-email-card" hidden aria-label="Digest contents"></article>
+      </div>
+    </section>
+  `;
+  refreshDigestPanel();
+}
+
 function renderSaved() {
   const routeView = document.getElementById("route-view");
   const jobs = getJobs();
@@ -677,12 +915,7 @@ function renderRoute(path) {
   }
 
   if (path === "/digest") {
-    routeView.innerHTML = `
-      <section class="route-content" aria-labelledby="route-title">
-        <h1 id="route-title" class="route-title">Digest</h1>
-        <p class="route-subtext">Daily summary previews will be introduced here in the next step.</p>
-      </section>
-    `;
+    renderDigest();
     return;
   }
 
@@ -762,6 +995,16 @@ function bindNavigation() {
 
     if (event.target.classList.contains("modal-backdrop")) {
       closeJobModal();
+      return;
+    }
+
+    const digestBtn = event.target.closest("[data-digest-action]");
+    if (digestBtn) {
+      event.preventDefault();
+      const act = digestBtn.getAttribute("data-digest-action");
+      if (act === "generate") handleDigestGenerate();
+      else if (act === "copy") handleDigestCopy();
+      else if (act === "email") handleDigestEmail();
       return;
     }
 
