@@ -45,6 +45,32 @@
 
       <main id="route-view" class="route-view" aria-live="polite"></main>
     </div>
+
+    <div id="job-modal" class="modal" hidden aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal tabindex="-1"></div>
+      <div
+        class="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title-heading"
+      >
+        <div class="modal-header">
+          <h2 id="modal-title-heading" class="modal-title" data-modal-title></h2>
+          <button type="button" class="modal-close" data-close-modal aria-label="Close dialog">
+            ×
+          </button>
+        </div>
+        <p class="modal-meta" data-modal-meta></p>
+        <div class="modal-body">
+          <h3 class="modal-section-title">Description</h3>
+          <div class="modal-description" data-modal-description></div>
+          <h3 class="modal-section-title">Skills</h3>
+          <ul class="skill-list" data-modal-skills></ul>
+        </div>
+      </div>
+    </div>
+
+    <script src="./jobs-data.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
